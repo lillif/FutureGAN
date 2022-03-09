@@ -9,7 +9,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_normal, kaiming_normal, calculate_gain
+# from torch.nn.init import xavier_normal, kaiming_normal, calculate_gain
+from torch.nn.init import xavier_normal, kaiming_normal_, calculate_gain # ** kaiming_normal is deprecated, changed all to kaiming_normal_ **
 from torch.autograd import Variable
 
 
@@ -101,7 +102,7 @@ class EqualizedConv3d(nn.Module):
     def __init__(self, c_in, c_out, k_size, stride, pad, initializer='kaiming', bias=False):
         super(EqualizedConv3d, self).__init__()
         self.conv = nn.Conv3d(c_in, c_out, k_size, stride, pad, bias=False)
-        if initializer == 'kaiming':    kaiming_normal(self.conv.weight, a=calculate_gain('conv3d'))
+        if initializer == 'kaiming':    kaiming_normal_(self.conv.weight, a=calculate_gain('conv3d')) # **kaiming_normal ->kaiming_normal_
         elif initializer == 'xavier':   xavier_normal(self.conv.weight)
             
         self.conv_w = self.conv.weight.data.clone()
@@ -121,7 +122,7 @@ class EqualizedConvTranspose3d(nn.Module):
     def __init__(self, c_in, c_out, k_size, stride, pad, initializer='kaiming'):
         super(EqualizedConvTranspose3d, self).__init__()
         self.deconv = nn.ConvTranspose3d(c_in, c_out, k_size, stride, pad, bias=False)
-        if initializer == 'kaiming':    kaiming_normal(self.deconv.weight, a=calculate_gain('conv3d'))
+        if initializer == 'kaiming':    kaiming_normal_(self.deconv.weight, a=calculate_gain('conv3d'))
         elif initializer == 'xavier':   xavier_normal(self.deconv.weight)
         
         self.deconv_w = self.deconv.weight.data.clone()
@@ -141,7 +142,7 @@ class EqualizedLinear(nn.Module):
     def __init__(self, c_in, c_out, initializer='kaiming'):
         super(EqualizedLinear, self).__init__()
         self.linear = nn.Linear(c_in, c_out, bias=False)
-        if initializer == 'kaiming':    kaiming_normal(self.linear.weight, a=calculate_gain('linear'))
+        if initializer == 'kaiming':    kaiming_normal_(self.linear.weight, a=calculate_gain('linear')) # kaiming_normal -> kaiming_normal_
         elif initializer == 'xavier':   torch.nn.init.xavier_normal(self.linear.weight)
         
         self.linear_w = self.linear.weight.data.clone()

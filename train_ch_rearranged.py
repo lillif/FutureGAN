@@ -38,101 +38,17 @@ from torch.autograd import Variable
 from torch.optim import Adam
 import torchvision.transforms as transforms
 from utils import save_video_grid, count_model_params
-from video_dataset import VideoFolder, video_loader
+# from video_dataset import VideoFolder, video_loader
 from torch.utils.data import DataLoader
 import model as model
 
-
-
-# =============================================================================
-# config options
-
-help_description = 'This script trains a FutureGAN model for video prediction according to the specified optional arguments.'
-
-parser = argparse.ArgumentParser(description=help_description)
-
-# general
-parser.add_argument('--dgx', type=bool, default=False, help='set to True, if code is run on dgx, default=`False`')
-parser.add_argument('--ngpu', type=int, default=1, help='number of gpus for (multi-)gpu training, default=1')
-parser.add_argument('--random_seed', type=int, default=int(time.time()), help='seed for generating random numbers, default = `int(time.time())`')
-parser.add_argument('--ext', action='append', default=['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm'], help='list of strings of allowed file extensions, default=[`.jpg`, `.jpeg`, `.png`, `.ppm`, `.bmp`, `.pgm`]')
-parser.add_argument('--use_ckpt', type=bool, default=False, help='continue training from checkpoint, default=`False`')
-
-parser.add_argument('--ckpt_path', action='append', help='list of path(s) to training checkpoints to continue training or for testing, [0] Generator and [1] Discriminator, default=``')
-parser.add_argument('--data_root', type=str, default='', help='path to root directory of training data (ex. -->path_to_dataset/train)')
-parser.add_argument('--log_dir', type=str, default='./logs', help='path to directory of log files')
-parser.add_argument('--experiment_name', type=str, default='', help='name of experiment (if empty, current date and time will be used), default=``')
-
-parser.add_argument('--d_cond', type=bool, default=True, help='condition discriminator on input frames, default=`True`')
-parser.add_argument('--nc', type=int, default=3, help='number of input image color channels, default=3')
-parser.add_argument('--max_resl', type=int, default=128, help='max. frame resolution --> image size: max_resl x max_resl , default=128')
-parser.add_argument('--nframes_in', type=int, default=12, help='number of input video frames in one sample, default=12')
-parser.add_argument('--nframes_pred', type=int, default=6, help='number of video frames to predict in one sample, default=6')
-# p100
-parser.add_argument('--batch_size_table', type=dict, default={4:32, 8:16, 16:8, 32:4, 64:2, 128:1, 256:1, 512:1, 1024:1}, help='batch size table:{img_resl:batch_size, ...}, change according to available gpu memory')
-## dgx
-#parser.add_argument('--batch_size_table', type=dict, default={4:256, 8:128, 16:64, 32:32, 64:16, 128:8, 256:1, 512:1, 1024:1}, help='batch size table:{img_resl:batch_size, ...}, change according to available gpu memory')
-parser.add_argument('--trns_tick', type=int, default=10, help='number of epochs for transition phase, default=10')
-parser.add_argument('--stab_tick', type=int, default=10, help='number of epochs for stabilization phase, default=10')
-
-# training
-parser.add_argument('--nz', type=int, default=512, help='dimension of input noise vector z, default=512')
-parser.add_argument('--ngf', type=int, default=512, help='feature dimension of final layer of generator, default=512')
-parser.add_argument('--ndf', type=int, default=512, help='feature dimension of first layer of discriminator, default=512')
-
-parser.add_argument('--loss', type=str, default='wgan_gp', help='which loss functions to use (choices: `gan`, `lsgan` or `wgan_gp`), default=`wgan_gp`')
-parser.add_argument('--d_eps_penalty', type=bool, default=True, help='adding an epsilon penalty term to wgan_gp loss to prevent loss drift (eps=0.001), default=True')
-parser.add_argument('--acgan', type=bool, default=False, help='adding a label penalty term to wgan_gp loss --> makes GAN conditioned on classification labels of dataset, default=False')
-parser.add_argument('--optimizer', type=str, default='adam', help='optimizer type, default=adam')
-parser.add_argument('--beta1', type=float, default=0.0, help='beta1 for adam')
-parser.add_argument('--beta2', type=float, default=0.99, help='beta2 for adam')
-parser.add_argument('--lr', type=float, default=0.001, help='learning rate, default=0.001')
-parser.add_argument('--lr_decay', type=float, default=0.87, help='learning rate decay at every resolution transition, default=0.87')
-
-parser.add_argument('--lrelu', type=bool, default=True, help='use leaky relu instead of relu, default=True')
-parser.add_argument('--padding', type=str, default='zero', help='which padding to use (choices: `zero`, `replication`), default=`zero`')
-parser.add_argument('--w_norm', type=bool, default=True, help='use weight scaling, default=True')
-parser.add_argument('--batch_norm', type=bool, default=False, help='use batch-normalization (not recommended), default=False')
-parser.add_argument('--g_pixelwise_norm', type=bool, default=True, help='use pixelwise normalization for generator, default=True')
-parser.add_argument('--d_gdrop', type=bool, default=False, help='use generalized dropout layer (inject multiplicative Gaussian noise) for discriminator when using LSGAN loss, default=False')
-parser.add_argument('--g_tanh', type=bool, default=False, help='use tanh at the end of generator, default=False')
-parser.add_argument('--d_sigmoid', type=bool, default=False, help='use sigmoid at the end of discriminator, default=False')
-parser.add_argument('--x_add_noise', type=bool, default=False, help='add noise to the real image(x) when using LSGAN loss, default=False')
-parser.add_argument('--z_pixelwise_norm', type=bool, default=False, help='if mode=`gen`: pixelwise normalization of latent vector (z), default=False')
-
-# display and save
-parser.add_argument('--tb_logging', type=bool, default=False, help='enable tensorboard visualization, default=True')
-parser.add_argument('--update_tb_every', type=int, default=100, help='display progress every specified iteration, default=100')
-parser.add_argument('--save_img_every', type=int, default=100, help='save images every specified iteration, default=100')
-parser.add_argument('--save_ckpt_every', type=int, default=5, help='save checkpoints every specified epoch, default=5')
-
-# parse and save training config
-config = parser.parse_args()
-
-# current time is used to name folders and files if --experiment_name is not specified
-current_time = time.strftime('%Y-%m-%d_%H%M%S')
-
-
-# =============================================================================
-#  import Logger if --tb_logging==True
-if  config.tb_logging:
-    from tb_logger import Logger
-
-
-# =============================================================================
-# enable cuda if gpu(s) is/are available
-
-if torch.cuda.is_available():
-    use_cuda = True
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-else:
-    use_cuda = False
-    torch.set_default_tensor_type('torch.FloatTensor')
+# ** added imports for climate hack **
+from climate_dataset import ClimateHackDataset
+import xarray as xr
+# ** end of added imports for climate hack **
 
 
 
-# =============================================================================
-# training routine
 
 class Trainer:
     '''
@@ -140,13 +56,13 @@ class Trainer:
 
     Data is assumed to be arranged in this way:
         data_root/video/frame.ext -> dataset/train/video1/frame1.ext
-                                                  -> dataset/train/video1/frame2.ext
-                                                  -> dataset/train/video2/frame1.ext
-                                                  -> ...
+                                                -> dataset/train/video1/frame2.ext
+                                                -> dataset/train/video2/frame1.ext
+                                                -> ...
     '''
 
     def __init__(self, config):
-
+        print('starting Trainer initialisation in __init__')
         self.config = config
 
         # log directory
@@ -167,7 +83,7 @@ class Trainer:
             print(' ... loading training configuration ... ')
             print(' ... saving training configuration to {}'.format(f))
 
-        self.train_data_root = self.config.data_root
+        # self.train_data_root = self.config.data_root
 
         # training samples
         self.train_sample_dir = self.log_dir+'/samples_train'
@@ -356,6 +272,8 @@ class Trainer:
                 os.makedirs(self.tb_dir)
             self.logger = Logger(self.tb_dir)
 
+        print('finished Trainer initialisation in __init__')
+
 
     def schedule_resl(self):
 
@@ -455,11 +373,30 @@ class Trainer:
         # renew dataloader
         self.img_size = int(pow(2,min(floor(self.resl), self.max_resl)))
         self.batch_size = int(self.batch_size_table[pow(2,min(floor(self.resl), self.max_resl))])
-        self.video_loader = video_loader
-        self.transform_video = transforms.Compose([transforms.Resize(size=(self.img_size,self.img_size), interpolation=Image.NEAREST), transforms.ToTensor(),])
-        self.dataset = VideoFolder(video_root=self.train_data_root, video_ext=self.ext, nframes=self.nframes, loader=self.video_loader, transform=self.transform_video)
-        self.dataloader = DataLoader(dataset=self.dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.nworkers)
+        
+        
+        
+        # ** change for climate data **
+        # ** transform images to lower resolution **
+        # self.video_loader = video_loader
+        self.transform_video = transforms.Compose([transforms.Resize(size=(self.img_size,self.img_size), interpolation=Image.NEAREST),]) # transforms.ToTensor(),]) # ** it's already a tensor **
+        
+        # ** change if dataset moves **
+        SATELLITE_ZARR_PATH = "/Users/lillifreischem/eumetsat_seviri_hrv_uk.zarr"
+
+        self.sat_dataset = xr.open_dataset(
+            SATELLITE_ZARR_PATH, 
+            engine="zarr",
+            chunks="auto",  # Load the data as a Dask array
+            )
+
+        self.dataset = ClimateHackDataset(self.sat_dataset, crops_per_slice=1, day_limit=1, transform=self.transform_video)
+        # self.dataset = VideoFolder(video_root=self.train_data_root, video_ext=self.ext, nframes=self.nframes, loader=self.video_loader, transform=self.transform_video)
+        self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.nworkers) # * shuffle cannot be True for iterable dataset, *
+        # self.dataloader = DataLoader(dataset=self.dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.nworkers)
         self.epoch_tick = int(ceil(len(self.dataset)/self.batch_size))
+
+
 
         # define tensors
         self.real_label = Variable(torch.FloatTensor(self.batch_size, 1).fill_(1))
@@ -539,12 +476,13 @@ class Trainer:
 
 
     def train(self):
+        print('entered Trainer.train(self)')
 
         # train loop
         for step in range(self.start_resl, self.max_resl+2):
 
             for iter in tqdm(range(self.iter_start,(self.trns_tick+self.stab_tick)*int(ceil(len(self.dataset)/self.batch_size)))):
-
+                if iter == 0: print(f"1 entered loop [resl={step}]") ## ** debug **
                 self.iter = iter
                 self.globalIter = self.globalIter+1
                 self.stack = self.stack + self.batch_size
@@ -552,7 +490,7 @@ class Trainer:
                     self.epoch = self.epoch + 1
                     self.stack = 0
 
-                   # save ckpt
+                # save ckpt
                     if self.epoch%self.config.save_ckpt_every==0:
                         self.save_ckpt(self.ckpt_dir)
 
@@ -582,6 +520,7 @@ class Trainer:
                     self.x_label = self.D(self.x[:,:,self.nframes_in:,:,:].detach())
                     self.x_gen_label = self.D(self.x_gen.detach())
 
+                if iter == 0: print(f"2 before setting loss_d [resl={step}]") ## ** debug **
                 # mse loss
                 if self.config.loss=='lsgan':
                     loss_d = self.criterion(self.x_label, self.real_label) + self.criterion(self.x_gen_label, self.fake_label)
@@ -612,8 +551,8 @@ class Trainer:
                     interpolates = Variable(interpolates, requires_grad=True)
                     interpolates_label = self.D(interpolates)
                     gradients = torch.autograd.grad(outputs=interpolates_label, inputs=interpolates,
-                              grad_outputs=torch.ones(interpolates_label.size()).cuda() if self.use_cuda else torch.ones(interpolates_label.size()),
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
+                            grad_outputs=torch.ones(interpolates_label.size()).cuda() if self.use_cuda else torch.ones(interpolates_label.size()),
+                            create_graph=True, retain_graph=True, only_inputs=True)[0]
 #                    gradients = torch.autograd.grad(outputs=interpolates_label.sum().cuda() if self.use_cuda else interpolates_label.sum(), inputs=interpolates, create_graph=True)[0]
                     gradients = gradients.view(gradients.size(0), -1)
                     gradient_penalty = ((gradients.norm(2, dim=1)-1)**2).mean()
@@ -633,6 +572,7 @@ class Trainer:
                         label_penalty_d = self.criterion(self.x_gen_label, self.fake_label)+self.criterion(self.x_label, self.real_label)
                         loss_d = loss_d+label_penalty_d*cond_weight_d
 
+                if iter == 0: print(f"3 before updating discriminator [resl={step}]") ## ** debug **
                 # update discriminator
                 loss_d.backward()
                 self.opt_d.step()
@@ -660,7 +600,8 @@ class Trainer:
                         cond_weight_g = 1.0
                         label_penalty_g = self.criterion(self.x_gen_label, self.fake_label)
                         loss_g = loss_g+label_penalty_g*cond_weight_g
-
+                
+                if iter == 0: print(f"4 before updating generator [resl={step}]") ## ** debug **
                 # update generator
                 loss_g.backward()
                 self.opt_g.step()
@@ -671,6 +612,7 @@ class Trainer:
                 else:
                     k = self.batch_size
 
+                if iter == 0: print(f"5 before saving videos [resl={step}]") ## ** debug **
                 # save video grid logs
                 if self.globalIter%self.config.save_img_every==0 or self.globalIter==1:
 
@@ -822,11 +764,107 @@ class Trainer:
         return var.data.numpy()
 
 
-# use cudnn backends to boost speed
-torch.backends.cudnn.benchmark = True
 
-if config.data_root=='':
-    raise Exception('Path to training data is undefined! Please specify the path in the --data_root flag!')
-else:
-    trainer = Trainer(config)
-    trainer.train()
+if __name__ == '__main__':
+    # =============================================================================
+    # config options
+    print("entered main")
+
+    help_description = 'This script trains a FutureGAN model for video prediction according to the specified optional arguments.'
+
+    parser = argparse.ArgumentParser(description=help_description)
+
+    # general
+    parser.add_argument('--dgx', type=bool, default=False, help='set to True, if code is run on dgx, default=`False`')
+    parser.add_argument('--ngpu', type=int, default=1, help='number of gpus for (multi-)gpu training, default=1')
+    parser.add_argument('--random_seed', type=int, default=int(time.time()), help='seed for generating random numbers, default = `int(time.time())`')
+    parser.add_argument('--ext', action='append', default=['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm'], help='list of strings of allowed file extensions, default=[`.jpg`, `.jpeg`, `.png`, `.ppm`, `.bmp`, `.pgm`]')
+    parser.add_argument('--use_ckpt', type=bool, default=False, help='continue training from checkpoint, default=`False`')
+
+    parser.add_argument('--ckpt_path', action='append', help='list of path(s) to training checkpoints to continue training or for testing, [0] Generator and [1] Discriminator, default=``')
+    parser.add_argument('--data_root', type=str, default='', help='path to root directory of training data (ex. -->path_to_dataset/train)')
+    parser.add_argument('--log_dir', type=str, default='./logs', help='path to directory of log files')
+    parser.add_argument('--experiment_name', type=str, default='', help='name of experiment (if empty, current date and time will be used), default=``')
+
+    parser.add_argument('--d_cond', type=bool, default=True, help='condition discriminator on input frames, default=`True`')
+    parser.add_argument('--nc', type=int, default=3, help='number of input image color channels, default=3')
+    parser.add_argument('--max_resl', type=int, default=128, help='max. frame resolution --> image size: max_resl x max_resl , default=128')
+    parser.add_argument('--nframes_in', type=int, default=12, help='number of input video frames in one sample, default=12')
+    parser.add_argument('--nframes_pred', type=int, default=6, help='number of video frames to predict in one sample, default=6')
+    # p100
+    parser.add_argument('--batch_size_table', type=dict, default={4:32, 8:16, 16:8, 32:4, 64:2, 128:1, 256:1, 512:1, 1024:1}, help='batch size table:{img_resl:batch_size, ...}, change according to available gpu memory')
+    ## dgx
+    #parser.add_argument('--batch_size_table', type=dict, default={4:256, 8:128, 16:64, 32:32, 64:16, 128:8, 256:1, 512:1, 1024:1}, help='batch size table:{img_resl:batch_size, ...}, change according to available gpu memory')
+    parser.add_argument('--trns_tick', type=int, default=10, help='number of epochs for transition phase, default=10')
+    parser.add_argument('--stab_tick', type=int, default=10, help='number of epochs for stabilization phase, default=10')
+
+    # training
+    parser.add_argument('--nz', type=int, default=512, help='dimension of input noise vector z, default=512')
+    parser.add_argument('--ngf', type=int, default=512, help='feature dimension of final layer of generator, default=512')
+    parser.add_argument('--ndf', type=int, default=512, help='feature dimension of first layer of discriminator, default=512')
+
+    parser.add_argument('--loss', type=str, default='wgan_gp', help='which loss functions to use (choices: `gan`, `lsgan` or `wgan_gp`), default=`wgan_gp`')
+    parser.add_argument('--d_eps_penalty', type=bool, default=True, help='adding an epsilon penalty term to wgan_gp loss to prevent loss drift (eps=0.001), default=True')
+    parser.add_argument('--acgan', type=bool, default=False, help='adding a label penalty term to wgan_gp loss --> makes GAN conditioned on classification labels of dataset, default=False')
+    parser.add_argument('--optimizer', type=str, default='adam', help='optimizer type, default=adam')
+    parser.add_argument('--beta1', type=float, default=0.0, help='beta1 for adam')
+    parser.add_argument('--beta2', type=float, default=0.99, help='beta2 for adam')
+    parser.add_argument('--lr', type=float, default=0.001, help='learning rate, default=0.001')
+    parser.add_argument('--lr_decay', type=float, default=0.87, help='learning rate decay at every resolution transition, default=0.87')
+
+    parser.add_argument('--lrelu', type=bool, default=True, help='use leaky relu instead of relu, default=True')
+    parser.add_argument('--padding', type=str, default='zero', help='which padding to use (choices: `zero`, `replication`), default=`zero`')
+    parser.add_argument('--w_norm', type=bool, default=True, help='use weight scaling, default=True')
+    parser.add_argument('--batch_norm', type=bool, default=False, help='use batch-normalization (not recommended), default=False')
+    parser.add_argument('--g_pixelwise_norm', type=bool, default=True, help='use pixelwise normalization for generator, default=True')
+    parser.add_argument('--d_gdrop', type=bool, default=False, help='use generalized dropout layer (inject multiplicative Gaussian noise) for discriminator when using LSGAN loss, default=False')
+    parser.add_argument('--g_tanh', type=bool, default=False, help='use tanh at the end of generator, default=False')
+    parser.add_argument('--d_sigmoid', type=bool, default=False, help='use sigmoid at the end of discriminator, default=False')
+    parser.add_argument('--x_add_noise', type=bool, default=False, help='add noise to the real image(x) when using LSGAN loss, default=False')
+    parser.add_argument('--z_pixelwise_norm', type=bool, default=False, help='if mode=`gen`: pixelwise normalization of latent vector (z), default=False')
+
+    # display and save
+    parser.add_argument('--tb_logging', type=bool, default=False, help='enable tensorboard visualization, default=True')
+    parser.add_argument('--update_tb_every', type=int, default=100, help='display progress every specified iteration, default=100')
+    parser.add_argument('--save_img_every', type=int, default=100, help='save images every specified iteration, default=100')
+    parser.add_argument('--save_ckpt_every', type=int, default=5, help='save checkpoints every specified epoch, default=5')
+
+    # parse and save training config
+    config = parser.parse_args()
+
+    # current time is used to name folders and files if --experiment_name is not specified
+    current_time = time.strftime('%Y-%m-%d_%H%M%S')
+
+
+    # =============================================================================
+    #  import Logger if --tb_logging==True
+    if  config.tb_logging:
+        from tb_logger import Logger
+
+
+    # =============================================================================
+    # enable cuda if gpu(s) is/are available
+
+    if torch.cuda.is_available():
+        use_cuda = True
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    else:
+        use_cuda = False
+        torch.set_default_tensor_type('torch.FloatTensor')
+
+
+
+    # =============================================================================
+    # training routine
+
+
+    # use cudnn backends to boost speed
+    torch.backends.cudnn.benchmark = True
+
+    if config.data_root=='':
+        raise Exception('Path to training data is undefined! Please specify the path in the --data_root flag!')
+    else:
+        print(f'initialiaing the Trainer with config {config}')
+        trainer = Trainer(config)
+        print('starting to train the Trainer')
+        trainer.train()

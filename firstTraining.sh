@@ -1,0 +1,1 @@
+python3 train_ch.py --random_seed 42 --data_root /Users/lillifreischem/eumetsat_seviri_hrv_uk.zarr --log_dir /Users/lillifreischem/climatehack/FutureGAN_Models --experiment_name firstExperiment --nc 1 --nframes_in 12 --nframes_pred 24 
