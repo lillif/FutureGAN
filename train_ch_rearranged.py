@@ -381,14 +381,25 @@ class Trainer:
         # self.video_loader = video_loader
         self.transform_video = transforms.Compose([transforms.Resize(size=(self.img_size,self.img_size), interpolation=Image.NEAREST),]) # transforms.ToTensor(),]) # ** it's already a tensor **
         
-        # ** change if dataset moves **
-        SATELLITE_ZARR_PATH = "/Users/lillifreischem/eumetsat_seviri_hrv_uk.zarr"
+
+        # *** online learning ***
+        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
 
         self.sat_dataset = xr.open_dataset(
             SATELLITE_ZARR_PATH, 
             engine="zarr",
             chunks="auto",  # Load the data as a Dask array
-            )
+        )
+
+        # *** on my computer ***
+        # # ** change if dataset moves **
+        # SATELLITE_ZARR_PATH = "/Users/lillifreischem/eumetsat_seviri_hrv_uk.zarr"
+
+        # self.sat_dataset = xr.open_dataset(
+        #     SATELLITE_ZARR_PATH, 
+        #     engine="zarr",
+        #     chunks="auto",  # Load the data as a Dask array
+        #     )
 
         self.dataset = ClimateHackDataset(self.sat_dataset, crops_per_slice=1, day_limit=1, transform=self.transform_video)
         # self.dataset = VideoFolder(video_root=self.train_data_root, video_ext=self.ext, nframes=self.nframes, loader=self.video_loader, transform=self.transform_video)
