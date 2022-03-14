@@ -26,30 +26,6 @@ The implementation of the wgan-gp loss borrows from:
     https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 '''
 
-import os
-import time
-import argparse
-from PIL import Image
-from math import floor, ceil
-import numpy as np
-from tqdm import tqdm
-import torch
-from torch.autograd import Variable
-from torch.optim import Adam
-import torchvision.transforms as transforms
-from utils import save_video_grid, count_model_params
-# from video_dataset import VideoFolder, video_loader
-from torch.utils.data import DataLoader
-import model as model
-
-# ** added imports for climate hack **
-from climate_dataset import ClimateHackDataset
-import xarray as xr
-# ** end of added imports for climate hack **
-
-
-
-
 class Trainer:
     '''
     Class to train a FutureGAN model.
@@ -777,6 +753,33 @@ class Trainer:
 
 
 if __name__ == '__main__':
+
+
+
+    import os
+    import time
+    import argparse
+    from PIL import Image
+    from math import floor, ceil
+    import numpy as np
+    from tqdm import tqdm
+    import torch
+    from torch.autograd import Variable
+    from torch.optim import Adam
+    import torchvision.transforms as transforms
+    from utils import save_video_grid, count_model_params
+    # from video_dataset import VideoFolder, video_loader
+    from torch.utils.data import DataLoader
+    import model as model
+
+    # ** added imports for climate hack **
+    from climate_dataset import ClimateHackDataset
+    import xarray as xr
+    # ** end of added imports for climate hack **
+
+
+
+
     # =============================================================================
     # config options
     print("entered main")
