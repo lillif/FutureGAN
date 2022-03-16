@@ -65,9 +65,9 @@ class Trainer:
         print('start loading dataset in init')
         # ** loading the dataset once! hopefully fixes issues **
         # *** online learning ***
-        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-        self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
-        # self.sat_dataset = xr.open_dataset(
+        # SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+        # # self.sat_dataset = xr.open_dataset(
         #     SATELLITE_ZARR_PATH, 
         #     engine="zarr",
         #     chunks="auto",  # Load the data as a Dask array
@@ -399,6 +399,10 @@ class Trainer:
         # # *** online learning ***
         # SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
 
+        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+        self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+       
+
         # self.sat_dataset = xr.open_dataset(
         #     SATELLITE_ZARR_PATH, 
         #     engine="zarr",
@@ -508,6 +512,12 @@ class Trainer:
 
             for iter in tqdm(range(self.iter_start,(self.trns_tick+self.stab_tick)*int(ceil(len(self.dataset)/self.batch_size)))):
                 if iter == 0: print(f"1 entered loop [resl={step}]") ## ** debug **
+
+                SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+                self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+       
+                # open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+
                 self.iter = iter
                 self.globalIter = self.globalIter+1
                 self.stack = self.stack + self.batch_size
