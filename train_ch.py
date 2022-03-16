@@ -106,6 +106,7 @@ class Trainer:
             self.tb_dir = self.log_dir+'/tensorboard'
 
         self.use_cuda = use_cuda
+        self.use_cuda = True # ** for gcloud ** 
         print(f"use cuda is {use_cuda}")
         self.nz = config.nz
         self.nc = config.nc
