@@ -828,7 +828,7 @@ if __name__ == '__main__':
     # ** end of added imports for climate hack **
 
 
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn', force=True)
 
     # =============================================================================
     # config options
