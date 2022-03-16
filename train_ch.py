@@ -910,6 +910,7 @@ if __name__ == '__main__':
     # enable cuda if gpu(s) is/are available
 
     if torch.cuda.is_available():
+        print('cuda enabled')
         use_cuda = True
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
     else:
