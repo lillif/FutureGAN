@@ -25,7 +25,7 @@ The implementation of the wgan-gp loss borrows from:
     https://github.com/igul222/improved_wgan_training/blob/master/gan_cifar.py and
     https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 '''
-
+import multiprocessing as mp
 from multiprocessing.dummy import freeze_support
 import fsspec
 import gcsfs
@@ -828,7 +828,7 @@ if __name__ == '__main__':
     # ** end of added imports for climate hack **
 
 
-
+    mp.set_start_method('spawn')
 
     # =============================================================================
     # config options
