@@ -28,6 +28,7 @@ The implementation of the wgan-gp loss borrows from:
 
 import fsspec
 import gcsfs
+import xarray as xr
 
 def open_zarr_on_gcp(filename) -> xr.DataArray:
     """Lazily opens the Zarr store on Google Cloud Storage (GCS)."""
