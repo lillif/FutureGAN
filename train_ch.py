@@ -198,11 +198,13 @@ class Trainer:
                 print(' ... initial models have been built successfully ... ')
                 print(' ... saving initial model strutures to {}'.format(f))
 
+            print('shipping to cuda and starting parallelisation')
             # ship everything to cuda and parallelize for ngpu>1
             if self.use_cuda:
                 self.criterion = self.criterion.cuda()
                 torch.cuda.manual_seed(config.random_seed)
                 if config.ngpu==1:
+                    print('1 gpu, starting parallel data')
                     self.G = torch.nn.DataParallel(self.G).cuda(device=0)
                     self.D = torch.nn.DataParallel(self.D).cuda(device=0)
                 else:
@@ -211,7 +213,7 @@ class Trainer:
                         gpus.append(i)
                     self.G = torch.nn.DataParallel(self.G, device_ids=gpus).cuda()
                     self.D = torch.nn.DataParallel(self.D, device_ids=gpus).cuda()
-
+            print('done with shipping to cuda')
         else:
 
             # re-ship everything to cuda
