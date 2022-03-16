@@ -61,6 +61,19 @@ class Trainer:
         print('starting Trainer initialisation in __init__')
         self.config = config
 
+        print('start loading dataset in init')
+        # ** loading the dataset once! hopefully fixes issues **
+        # *** online learning ***
+        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+        self.sat_dataset = xr.open_dataset(
+            SATELLITE_ZARR_PATH, 
+            engine="zarr",
+            chunks="auto",  # Load the data as a Dask array
+        )
+
+        print('finished loading dataset in init')
+
         # log directory
         if self.config.experiment_name=='':
             self.experiment_name = current_time
@@ -267,17 +280,6 @@ class Trainer:
             if not os.path.exists(self.tb_dir):
                 os.makedirs(self.tb_dir)
             self.logger = Logger(self.tb_dir)
-
-
-        # ** loading the dataset once! hopefully fixes issues **
-        # *** online learning ***
-        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
-        self.sat_dataset = xr.open_dataset(
-            SATELLITE_ZARR_PATH, 
-            engine="zarr",
-            chunks="auto",  # Load the data as a Dask array
-        )
 
         print('finished Trainer initialisation in __init__')
 
