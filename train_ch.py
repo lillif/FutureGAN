@@ -122,7 +122,7 @@ class Trainer:
         self.nframes = self.nframes_in+self.nframes_pred
         self.ext = config.ext
         # self.nworkers = 4
-        self.nworkers = 2
+        self.nworkers = 1
         self.trns_tick = config.trns_tick
         self.stab_tick = config.stab_tick
         self.complete = 0.0
