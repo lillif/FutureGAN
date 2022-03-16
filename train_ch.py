@@ -26,6 +26,7 @@ The implementation of the wgan-gp loss borrows from:
     https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 '''
 
+from multiprocessing.dummy import freeze_support
 import fsspec
 import gcsfs
 import xarray as xr
@@ -500,7 +501,7 @@ class Trainer:
 
 
     def get_batch(self):
-
+        freeze_support() # worth a shot
         dataIter = iter(self.dataloader)
         return next(dataIter)
 
