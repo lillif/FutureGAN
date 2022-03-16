@@ -26,6 +26,26 @@ The implementation of the wgan-gp loss borrows from:
     https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 '''
 
+# import fsspec
+# import gcsfs
+
+# def open_zarr_on_gcp(filename) -> xr.DataArray:
+#     """Lazily opens the Zarr store on Google Cloud Storage (GCS)."""
+#     gcs = gcsfs.GCSFileSystem(
+#         access='read_only', 
+#         skip_instance_cache=True  # Why skip_instance_cache?  See https://github.com/dask/gcsfs/issues/379#issuecomment-839929801
+#     )
+
+#     # Clear reference to the loop and thread.
+#     # See https://github.com/dask/gcsfs/issues/379#issuecomment-839929801
+#     # Only relevant for fsspec >= 0.9.0
+#     fsspec.asyn.iothread[0] = None
+#     fsspec.asyn.loop[0] = None
+
+#     store = gcsfs.GCSMap(root=filename, gcs=gcs)
+#     return xr.open_zarr(store)
+
+
 class Trainer:
     '''
     Class to train a FutureGAN model.
@@ -236,10 +256,10 @@ class Trainer:
             lr = self.lr
             for i in range(1,int(floor(self.resl))-1):
                 self.lr = lr*(self.config.lr_decay**i)
-#            self.opt_g.load_state_dict(self.ckpt_g['optimizer'])
-#            self.opt_d.load_state_dict(self.ckpt_d['optimizer'])
-#            for param_group in self.opt_g.param_groups:
-#                self.lr = param_group['lr']
+            # self.opt_g.load_state_dict(self.ckpt_g['optimizer'])
+            # self.opt_d.load_state_dict(self.ckpt_d['optimizer'])
+            # for param_group in self.opt_g.param_groups:
+            #   self.lr = param_group['lr']
 
         # tensorboard logging
         self.tb_logging = self.config.tb_logging
@@ -247,6 +267,17 @@ class Trainer:
             if not os.path.exists(self.tb_dir):
                 os.makedirs(self.tb_dir)
             self.logger = Logger(self.tb_dir)
+
+
+        # ** loading the dataset once! hopefully fixes issues **
+        # *** online learning ***
+        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+        self.sat_dataset = xr.open_dataset(
+            SATELLITE_ZARR_PATH, 
+            engine="zarr",
+            chunks="auto",  # Load the data as a Dask array
+        )
 
         print('finished Trainer initialisation in __init__')
 
@@ -357,15 +388,15 @@ class Trainer:
         # self.video_loader = video_loader
         self.transform_video = transforms.Compose([transforms.Resize(size=(self.img_size,self.img_size), interpolation=Image.NEAREST),]) # transforms.ToTensor(),]) # ** it's already a tensor **
         
+        # *** moved this to __init__ hoping it makes things fork safe and faster **
+        # # *** online learning ***
+        # SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
 
-        # *** online learning ***
-        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-
-        self.sat_dataset = xr.open_dataset(
-            SATELLITE_ZARR_PATH, 
-            engine="zarr",
-            chunks="auto",  # Load the data as a Dask array
-        )
+        # self.sat_dataset = xr.open_dataset(
+        #     SATELLITE_ZARR_PATH, 
+        #     engine="zarr",
+        #     chunks="auto",  # Load the data as a Dask array
+        # )
 
         # *** on my computer ***
         # # ** change if dataset moves **
