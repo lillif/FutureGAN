@@ -66,16 +66,13 @@ class Trainer:
         print('start loading dataset in init')
         # ** loading the dataset once! hopefully fixes issues **
         # *** online learning ***
-        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
-        SATELLITE_ZARR_PATH = "/Users/lillifreischem/eumetsat_seviri_hrv_uk.zarr"
         # SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
         # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
-        self.sat_dataset = xr.open_dataset(
-            SATELLITE_ZARR_PATH, 
-            engine="zarr",
-            chunks="auto",  # Load the data as a Dask array
-        )
+        # # self.sat_dataset = xr.open_dataset(
+        #     SATELLITE_ZARR_PATH, 
+        #     engine="zarr",
+        #     chunks="auto",  # Load the data as a Dask array
+        # )
 
         print('finished loading dataset in init')
 
@@ -110,8 +107,7 @@ class Trainer:
             self.tb_dir = self.log_dir+'/tensorboard'
 
         self.use_cuda = use_cuda
-        # self.use_cuda = True # ** for gcloud ** 
-        
+        self.use_cuda = True # ** for gcloud ** 
         print(f"use cuda is {use_cuda}")
         self.nz = config.nz
         self.nc = config.nc
@@ -404,7 +400,16 @@ class Trainer:
         # *** moved this to __init__ hoping it makes things fork safe and faster **
         # # *** online learning ***
         # SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-        # self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+
+        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+        self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+       
+
+        # self.sat_dataset = xr.open_dataset(
+        #     SATELLITE_ZARR_PATH, 
+        #     engine="zarr",
+        #     chunks="auto",  # Load the data as a Dask array
+        # )
 
         # *** on my computer ***
         # # ** change if dataset moves **
@@ -504,17 +509,16 @@ class Trainer:
     def train(self):
         print('entered Trainer.train(self)')
 
-        SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
-        self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
-       
         # train loop
         for step in range(self.start_resl, self.max_resl+2):
 
             for iter in tqdm(range(self.iter_start,(self.trns_tick+self.stab_tick)*int(ceil(len(self.dataset)/self.batch_size)))):
-                if iter == 0: 
-                    print(f"1 entered loop [resl={step}]") ## ** debug **
-                    print(f"{(self.trns_tick+self.stab_tick)*int(ceil(len(self.dataset)/self.batch_size))}")
-                print(iter)
+                if iter == 0: print(f"1 entered loop [resl={step}]") ## ** debug **
+
+                SATELLITE_ZARR_PATH = "gs://public-datasets-eumetsat-solar-forecasting/satellite/EUMETSAT/SEVIRI_RSS/v3/eumetsat_seviri_hrv_uk.zarr"
+                self.sat_dataset = open_zarr_on_gcp(SATELLITE_ZARR_PATH)
+       
+                # open_zarr_on_gcp(SATELLITE_ZARR_PATH)
 
                 self.iter = iter
                 self.globalIter = self.globalIter+1
@@ -799,6 +803,8 @@ class Trainer:
 
 
 if __name__ == '__main__':
+
+
 
     import os
     import time
